@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="notes-container">
+    <div class="notes-header">
+        <h2>Notes</h2>
+        <button onclick="showAddNote()" class="btn btn-primary">+ Add Note</button>
+    </div>
+
+    <div id="add-note-form" class="note-form hidden">
+        <h3>Add New Note</h3>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="new-date">Date</label>
+                <input type="date" id="new-date" value="{{ today }}">
+            </div>
+            <div class="form-group">
+                <label for="new-netname">Net Name (optional)</label>
+                <input type="text" id="new-netname" placeholder="e.g., M4Mini2TB">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="new-note">Note</label>
+            <textarea id="new-note" rows="3" placeholder="Enter note..."></textarea>
+        </div>
+        <div class="form-actions">
+            <button onclick="saveNewNote()" class="btn btn-primary">Save Note</button>
+            <button onclick="hideAddNote()" class="btn btn-secondary">Cancel</button>
+        </div>
+    </div>
+
+    <div class="notes-list">
+        {% set current_date = none %}
+        {% for note in notes %}
+            {% if note['date'] != current_date %}
+                {% if current_date is not none %}</div>{% endif %}
+                <div class="notes-date-group">
+                    <h3 class="date-header">{{ note['date'] }}</h3>
+                {% set current_date = note['date'] %}
+            {% endif %}
+
+            <div class="note-item" data-id="{{ note['id'] }}">
+                <div class="note-content">
+                    {% if note['net_name'] %}
+                    <span class="note-netname">{{ note['net_name'] }}:</span>
+                    {% endif %}
+                    <span class="note-text">{{ note['note'] }}</span>
+                </div>
+                <div class="note-actions">
+                    <button onclick="editNote({{ note['id'] }})" class="btn btn-sm">Edit</button>
+                    <button onclick="deleteNote({{ note['id'] }})" class="btn btn-danger btn-sm">Delete</button>
+                </div>
+            </div>
+        {% endfor %}
+        {% if notes %}</div>{% endif %}
+
+        {% if not notes %}
+        <div class="no-notes">
+            <p>No notes yet. Add one to get started.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function showAddNote() {
+        document.getElementById('add-note-form').classList.remove('hidden');
+        document.getElementById('new-date').valueAsDate = new Date();
+    }
+
+    function hideAddNote() {
+        document.getElementById('add-note-form').classList.add('hidden');
+    }
+
+    async function saveNewNote() {
+        const date = document.getElementById('new-date').value;
+        const netName = document.getElementById('new-netname').value;
+        const note = document.getElementById('new-note').value;
+
+        if (!date || !note) {
+            alert('Please fill in date and note');
+            return;
+        }
+
+        const result = await apiCall('/api/note', 'POST', {
+            date: date,
+            net_name: netName,
+            note: note
+        });
+
+        if (result.success) {
+            location.reload();
+        }
+    }
+
+    async function editNote(id) {
+        const noteItem = document.querySelector(`.note-item[data-id="${id}"]`);
+        const noteText = noteItem.querySelector('.note-text').textContent;
+        const netName = noteItem.querySelector('.note-netname');
+        const netNameText = netName ? netName.textContent.replace(':', '') : '';
+
+        const newNote = prompt('Edit note:', noteText);
+        if (newNote !== null && newNote !== noteText) {
+            const dateHeader = noteItem.closest('.notes-date-group').querySelector('.date-header').textContent;
+            const result = await apiCall(`/api/note/${id}`, 'PUT', {
+                date: dateHeader,
+                net_name: netNameText,
+                note: newNote
+            });
+
+            if (result.success) {
+                noteItem.querySelector('.note-text').textContent = newNote;
+            }
+        }
+    }
+
+    async function deleteNote(id) {
+        if (confirm('Delete this note?')) {
+            const result = await apiCall(`/api/note/${id}`, 'DELETE');
+            if (result.success) {
+                document.querySelector(`.note-item[data-id="${id}"]`).remove();
+            }
+        }
+    }
+</script>
+{% endblock %}

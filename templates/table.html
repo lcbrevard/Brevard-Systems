@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="table-container">
+    <div class="table-header">
+        <h2>Computer Assets</h2>
+        <button onclick="addNewRow()" class="btn btn-primary">+ Add New Asset</button>
+    </div>
+    <div class="table-scroll">
+        <table id="assets-table">
+            <thead>
+                <tr>
+                    {% for col in display_columns %}
+                    <th>{{ col }}</th>
+                    {% endfor %}
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for asset in assets %}
+                <tr data-id="{{ asset['id'] }}">
+                    {% for col in columns %}
+                    <td class="editable" data-column="{{ col }}" {% if col == 'id' %}data-readonly="true"{% endif %}>
+                        {{ asset[col] if asset[col] else '' }}
+                    </td>
+                    {% endfor %}
+                    <td class="actions">
+                        <button onclick="deleteRow({{ asset['id'] }})" class="btn btn-danger btn-sm">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Make cells editable on click
+    document.querySelectorAll('td.editable:not([data-readonly="true"])').forEach(cell => {
+        cell.addEventListener('click', function() {
+            if (this.querySelector('input')) return;
+
+            const originalValue = this.textContent.trim();
+            const column = this.dataset.column;
+            const row = this.closest('tr');
+            const id = row.dataset.id;
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = originalValue;
+            input.className = 'cell-input';
+
+            this.textContent = '';
+            this.appendChild(input);
+            input.focus();
+            input.select();
+
+            const saveValue = async () => {
+                const newValue = input.value;
+                this.textContent = newValue;
+
+                if (newValue !== originalValue) {
+                    await apiCall('/api/cell', 'POST', {
+                        id: parseInt(id),
+                        column: column,
+                        value: newValue
+                    });
+                }
+            };
+
+            input.addEventListener('blur', saveValue);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    input.blur();
+                } else if (e.key === 'Escape') {
+                    this.textContent = originalValue;
+                }
+            });
+        });
+    });
+
+    async function addNewRow() {
+        const result = await apiCall('/api/asset', 'POST', {
+            status: 'Y',
+            net_name: 'New Asset',
+            form_factor: '',
+            vendor: '',
+            model: ''
+        });
+
+        if (result.success) {
+            location.reload();
+        }
+    }
+
+    async function deleteRow(id) {
+        if (confirm('Are you sure you want to delete this asset?')) {
+            const result = await apiCall(`/api/asset/${id}`, 'DELETE');
+            if (result.success) {
+                document.querySelector(`tr[data-id="${id}"]`).remove();
+            }
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="form-container">
+    <div class="form-sidebar">
+        <h3>Assets</h3>
+        <div class="asset-list">
+            {% for a in assets %}
+            <a href="{{ url_for('form_view', asset_id=a['id']) }}"
+               class="asset-item {% if a['id'] == current_id %}active{% endif %}">
+                {{ a['net_name'] }}
+            </a>
+            {% endfor %}
+        </div>
+        <button onclick="createNewAsset()" class="btn btn-primary btn-full">+ New Asset</button>
+    </div>
+
+    <div class="form-main">
+        {% if asset %}
+        <div class="form-header">
+            <h2>{{ asset['net_name'] }}</h2>
+            <div class="form-actions">
+                <button onclick="saveForm()" class="btn btn-primary">Save Changes</button>
+                <button onclick="deleteAsset({{ asset['id'] }})" class="btn btn-danger">Delete Asset</button>
+            </div>
+        </div>
+
+        <form id="asset-form" data-id="{{ asset['id'] }}">
+            <div class="form-grid">
+                {% for col, display in zip(columns, display_columns) %}
+                <div class="form-group">
+                    <label for="{{ col }}">{{ display }}</label>
+                    <input type="text" id="{{ col }}" name="{{ col }}"
+                           value="{{ asset[col] if asset[col] else '' }}">
+                </div>
+                {% endfor %}
+            </div>
+        </form>
+
+        <div class="form-nav">
+            {% set prev_asset = none %}
+            {% set next_asset = none %}
+            {% set found = false %}
+            {% for a in assets %}
+                {% if found and next_asset is none %}
+                    {% set next_asset = a %}
+                {% endif %}
+                {% if a['id'] == current_id %}
+                    {% set found = true %}
+                {% endif %}
+                {% if not found %}
+                    {% set prev_asset = a %}
+                {% endif %}
+            {% endfor %}
+
+            <a href="{{ url_for('form_view', asset_id=assets[-1]['id']) if assets else '#' }}"
+               class="btn btn-secondary">&laquo; Previous</a>
+            <a href="{{ url_for('form_view', asset_id=assets[0]['id']) if assets else '#' }}"
+               class="btn btn-secondary">Next &raquo;</a>
+        </div>
+        {% else %}
+        <div class="no-asset">
+            <p>No assets found. Create one to get started.</p>
+            <button onclick="createNewAsset()" class="btn btn-primary">+ Create Asset</button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function saveForm() {
+        const form = document.getElementById('asset-form');
+        const id = form.dataset.id;
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+
+        const result = await apiCall(`/api/asset/${id}`, 'PUT', data);
+        if (result.success) {
+            showMessage('Changes saved successfully!', 'success');
+        }
+    }
+
+    async function createNewAsset() {
+        const result = await apiCall('/api/asset', 'POST', {
+            status: 'Y',
+            net_name: 'New Asset',
+            form_factor: '',
+            vendor: '',
+            model: ''
+        });
+
+        if (result.success) {
+            window.location.href = `/form/${result.id}`;
+        }
+    }
+
+    async function deleteAsset(id) {
+        if (confirm('Are you sure you want to delete this asset?')) {
+            const result = await apiCall(`/api/asset/${id}`, 'DELETE');
+            if (result.success) {
+                window.location.href = '/form';
+            }
+        }
+    }
+
+    function showMessage(text, type) {
+        const msg = document.createElement('div');
+        msg.className = `message ${type}`;
+        msg.textContent = text;
+        document.body.appendChild(msg);
+        setTimeout(() => msg.remove(), 3000);
+    }
+
+    // Save on Ctrl+S
+    document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            saveForm();
+        }
+    });
+</script>
+{% endblock %}
